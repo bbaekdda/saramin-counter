@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const apiUrl = `https://api-career.saramin.co.kr/api/v2/comments/${userId}/list?size=400`;
+    const apiUrl = `https://api-career.saramin.co.kr/api/v2/comments/${userId}/list?size=9999`;
     const response = await fetch(apiUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',

@@ -20,7 +20,7 @@
       border-radius: 16px;
       padding: 2rem;
       width: 100%;
-      max-width: 560px;
+      max-width: 700px;
       box-shadow: 0 2px 16px rgba(0,0,0,0.08);
     }
     h1 { font-size: 18px; font-weight: 600; color: #111; margin-bottom: 4px; }
@@ -56,7 +56,7 @@
       font-size: 13px; color: #c00;
       display: none; margin-bottom: 1rem; line-height: 1.6;
     }
-    .profiles-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .profiles-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
     .profile-card { border: 1px solid #eee; border-radius: 12px; overflow: hidden; }
     .profile-head { padding: 12px 14px; background: #f8f8f8; border-bottom: 1px solid #eee; }
     .profile-head .pid { font-size: 11px; color: #aaa; font-family: monospace; margin-bottom: 2px; }
@@ -90,7 +90,7 @@
     </div>
   </div>
 
-  <button class="run-btn" id="run-btn" onclick="runAll()">▶ 프로필 동시 조회</button>
+  <button class="run-btn" id="run-btn" onclick="runAll()">▶ 세 프로필 동시 조회</button>
 
   <div class="err-box" id="err-box"></div>
 
@@ -163,16 +163,16 @@ function getPeriod() {
 }
 
 function fmt(d) {
-  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+  return d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
 }
 
 function initDisplay() {
   const now = new Date();
   const { start, end } = getPeriod();
-  document.getElementById('period-text').textContent = `${fmt(start)} ~ ${fmt(end)}`;
-  document.getElementById('today-text').textContent = `오늘: ${fmt(now)}`;
+  document.getElementById('period-text').textContent = fmt(start) + ' ~ ' + fmt(end);
+  document.getElementById('today-text').textContent = '오늘: ' + fmt(now);
   const days = Math.ceil((end - now) / 86400000);
-  document.getElementById('remain-text').textContent = days > 0 ? `마감까지 ${days}일 남음` : '기간 마감';
+  document.getElementById('remain-text').textContent = days > 0 ? '마감까지 ' + days + '일 남음' : '기간 마감';
 }
 
 function setStatus(i, pct, msg) {
@@ -181,12 +181,12 @@ function setStatus(i, pct, msg) {
 }
 
 async function fetchProfile(i) {
-  const { id } = PROFILES[i];
+  const id = PROFILES[i].id;
   const { start, end } = getPeriod();
 
   setStatus(i, 20, 'API 호출 중...');
-  const res = await fetch(`/api/comments?userId=${id}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const res = await fetch('/api/comments?userId=' + id);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
 
   setStatus(i, 60, '데이터 분석 중...');
   const data = await res.json();
@@ -196,11 +196,13 @@ async function fetchProfile(i) {
   }
 
   const content = data.body.content;
-  const inPeriod = content.filter(item => {
+  const inPeriod = content.filter(function(item) {
     const d = new Date(item.regDtm);
     return d >= start && d <= end;
   });
-  const passing = inPeriod.filter(item => item.contCnnt && item.contCnnt.length >= 150);
+  const passing = inPeriod.filter(function(item) {
+    return item.contCnnt && item.contCnnt.length >= 150;
+  });
 
   setStatus(i, 100, '완료');
   return { pass: passing.length, period: inPeriod.length, total: content.length };
@@ -213,27 +215,28 @@ async function runAll() {
   btn.disabled = true;
   btn.textContent = '⏳ 조회 중...';
 
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < PROFILES.length; i++) {
     const el = document.getElementById('count-' + i);
-    el.textContent = '...'; el.className = 'big-count';
+    el.textContent = '...';
+    el.className = 'big-count';
     document.getElementById('period-' + i).textContent = '—';
     document.getElementById('total-' + i).textContent = '—';
     setStatus(i, 5, '대기 중...');
   }
 
-  const results = await Promise.allSettled([fetchProfile(0), fetchProfile(1)]);
+  const promises = PROFILES.map(function(p, i) { return fetchProfile(i); });
+  const results = await Promise.allSettled(promises);
 
-  results.forEach((res, i) => {
+  results.forEach(function(res, i) {
     const el = document.getElementById('count-' + i);
     if (res.status === 'fulfilled') {
-      const { pass, period, total } = res.value;
-      el.textContent = pass;
+      el.textContent = res.value.pass;
       el.className = 'big-count done';
-      document.getElementById('period-' + i).textContent = period + '개';
-      document.getElementById('total-' + i).textContent = total + '개';
+      document.getElementById('period-' + i).textContent = res.value.period + '개';
+      document.getElementById('total-' + i).textContent = res.value.total + '개';
     } else {
       el.textContent = '오류';
-      setStatus(i, 0, res.reason?.message || '조회 실패');
+      setStatus(i, 0, res.reason ? res.reason.message : '조회 실패');
       document.getElementById('err-box').textContent = '조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
       document.getElementById('err-box').style.display = 'block';
     }
@@ -241,7 +244,7 @@ async function runAll() {
 
   const now = new Date();
   document.getElementById('updated-at').textContent =
-    `마지막 조회: ${fmt(now)} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    '마지막 조회: ' + fmt(now) + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
 
   btn.disabled = false;
   btn.textContent = '↺ 다시 조회';

@@ -211,7 +211,10 @@ async function fetchProfile(i) {
   }
 
   const content = data.body.content;
-  const inPeriod = content.filter(function(item) {
+  const notDeleted = content.filter(function(item) {
+    return item.delYn !== 'YES';
+  });
+  const inPeriod = notDeleted.filter(function(item) {
     const d = new Date(item.regDtm);
     return d >= start && d <= end;
   });
